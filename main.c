@@ -2,12 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <xmmintrin.h>
-
-uint64_t rdtsc() {
-  uint64_t tsc;
-  __asm__ volatile("rdtsc" : "=A"(tsc));
-  return tsc;
-}
+#include <x86intrin.h>
 
 int main() {
   float *data = aligned_alloc(16, 16);
@@ -17,13 +12,13 @@ int main() {
   data[3] = 4.0;
 
   int iteration = 100000000;
-  uint64_t start = rdtsc();
+  uint64_t start = __rdtsc();
   for (int i = 0; i <= iteration; ++i) {
     __m128 a = _mm_load_ps(data);
     __m128 b = _mm_load_ps(data);
     __m128 s = _mm_add_ps(a, b);
   }
-  uint64_t end = rdtsc();
+  uint64_t end = __rdtsc();
 
   // float r[4];
   // _mm_store_ps(r, s);
