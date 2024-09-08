@@ -1,13 +1,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <xmmintrin.h>
 
-uint64_t rdtsc() {
-  uint64_t tsc;
-  __asm__ volatile("rdtsc" : "=A"(tsc));
-  return tsc;
-}
 
 int main() {
   float *data = aligned_alloc(16, 16);
@@ -16,19 +12,22 @@ int main() {
   data[2] = 3.0;
   data[3] = 4.0;
 
-  uint64_t start_time = rdtsc();
-  int iteration = 10000000;
+  struct timespec start, end;
+  int iteration = 100000000;
+  clock_gettime(1, &start);
   for (int i = 0; i <= iteration; ++i) {
     __m128 a = _mm_load_ps(data);
     __m128 b = _mm_load_ps(data);
     __m128 s = _mm_add_ps(a, b);
   }
-  uint64_t end_time = rdtsc();
+  clock_gettime(1, &end);
 
   // float r[4];
   // _mm_store_ps(r, s);
+  //
+  double et = ((end.tv_sec - start.tv_sec) * 1e9) + (end.tv_nsec - start.tv_nsec);
 
-  printf("Clock Cycles: %lu \n", ((end_time - start_time) / iteration));
+  printf("Clock Cycles: %f | Elapsed Time: %f \n", ((et / iteration) * 3.5), et);
   // printf("%f %f %f %f", r[0], r[1], r[2], r[3]);
 
   free(data);
