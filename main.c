@@ -18,24 +18,29 @@ uint64_t average_cycle_taken(void operation()) {
   return ((end - start) / iteration);
 }
 
-void packed_add() {
-  float *data = aligned_alloc(16, 16);
+float *data;
+
+void sse_add() { __m128 s = _mm_add_ps(_mm_load_ps(data), _mm_load_ps(data)); }
+
+void normal_add() {
+  float data[4] = {1.0, 2.0, 3.0, 4.0};
+  for (int i = 0; i < 4; ++i) {
+    data[i] + data[i];
+  }
+}
+
+int main() {
+  // setup sse registers
+  data = aligned_alloc(16, 4 * sizeof(float));
   data[0] = 1.0;
   data[1] = 2.0;
   data[2] = 3.0;
   data[3] = 4.0;
 
-  __m128 s = _mm_add_ps(_mm_load_ps(data), _mm_load_ps(data));
+  uint64_t sse_add_cycles = average_cycle_taken(&sse_add);
+  uint64_t normal_add_cycles = average_cycle_taken(&normal_add);
 
-  float r[4];
-  _mm_store_ps(r, s);
-
-  free(data);
-}
-
-int main() {
-  uint64_t cycles = average_cycle_taken(&packed_add);
-
-  printf("Clock Cycles: %ld \n", cycles);
+  printf("Normal Clock Cycles: %ld  | SSE Clock Cycles: %ld \n",
+         normal_add_cycles, sse_add_cycles);
   return 0;
 }
