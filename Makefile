@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -std=c11 -pedantic -ggdb -I./include -march=native
+CFLAGS=-Wall -Wextra -std=c11 -pedantic -ggdb -I./include -march=native -O3 -D_POSIX_C_SOURCE=199309L
 LIBS=
 
 all: main

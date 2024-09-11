@@ -1,70 +1,66 @@
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+#include <stdint.h>
 #include <x86intrin.h>
 #include <xmmintrin.h>
 
-#ifndef ITERATION_COUNT
-#define ITERATION_COUNT 100000000;
-#endif
-
-/// @brief Calculate the average cycle taken by the operation
-/// over ITERATION_COUNT (default 100000000) iterations.
-uint64_t average_cycle_taken(void operation()) {
-  int iteration = ITERATION_COUNT;
-  uint64_t start = __rdtsc();
-  for (int i = 0; i <= iteration; ++i) {
-    operation();
-  }
-  uint64_t end = __rdtsc();
-  return ((end - start) / iteration);
-}
-
-// data to be used in the sse operation
-// it'll be aligned to 16 bytes before
-// running the sse operations. i'm doing
-// it in global scope to prevent overhead.
-float *data;
+const long ITERATION_COUNT = 1000000000;
 
 // SSE Add vs Scaler Add
-void sse_add() { __m128 s = _mm_add_ps(_mm_load_ps(data), _mm_load_ps(data)); }
-void scaler_add() {
-  float data[4] = {1.0, 2.0, 3.0, 4.0};
+__m128 sse_add(float *data) {
+  __m128 s = _mm_add_ps(_mm_load_ps(data), _mm_load_ps(data));
+  return s;
+}
+void scaler_add(float *data) {
   for (int i = 0; i < 4; ++i) {
-    data[i] + data[i];
+    data[i] = data[i] + data[i];
   }
 }
 
-// SSE Multiply vs Scaler Multiply
-void sse_multiply() {
-  __m128 s = _mm_mul_ps(_mm_load_ps(data), _mm_load_ps(data));
-}
-void scaler_multiply() {
-  float data[4] = {1.0, 2.0, 3.0, 4.0};
-  for (int i = 0; i < 4; ++i) {
-    data[i] * data[i];
+// Function to measure time using clock_gettime()
+struct timespec diff(struct timespec start, struct timespec end) {
+  struct timespec temp;
+  if ((end.tv_nsec - start.tv_nsec) < 0) {
+    temp.tv_sec = end.tv_sec - start.tv_sec - 1;
+    temp.tv_nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
+  } else {
+    temp.tv_sec = end.tv_sec - start.tv_sec;
+    temp.tv_nsec = end.tv_nsec - start.tv_nsec;
   }
+  return temp;
 }
 
 int main() {
-  // setup sse registers
-  data = aligned_alloc(16, 4 * sizeof(float));
-  data[0] = 1.0;
-  data[1] = 2.0;
-  data[2] = 3.0;
-  data[3] = 4.0;
+  struct timespec start, end;
+  double scaler_add_time, sse_add_time;
 
-  // add operations
-  uint64_t sse_add_cycles = average_cycle_taken(&sse_add);
-  uint64_t normal_add_cycles = average_cycle_taken(&scaler_add);
-  printf("[Add] Scaler Cycles: %ld  | SSE Cycles: %ld \n", normal_add_cycles,
-         sse_add_cycles);
+  // Measure scaler add
+  clock_gettime(CLOCK_MONOTONIC, &start);
+  for (int i = 0; i < ITERATION_COUNT; ++i) {
+    float scaler_data[4] = {1.0, 2.0, 3.0, 4.0};
+    scaler_add(scaler_data);
+  }
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  struct timespec diff_scaler = diff(start, end);
+  scaler_add_time = diff_scaler.tv_sec + (diff_scaler.tv_nsec / 1e9);
 
-  // mult operations
-  uint64_t sse_mul_cycles = average_cycle_taken(&sse_multiply);
-  uint64_t normal_mul_cycles = average_cycle_taken(&scaler_multiply);
-  printf("[Multiply] Scaler Cycles: %ld  | SSE Cycles: %ld \n",
-         normal_mul_cycles, sse_mul_cycles);
+  // Measure SSE add
+  clock_gettime(CLOCK_MONOTONIC, &start);
+  for (int i = 0; i < ITERATION_COUNT; ++i) {
+    float *sse_data = (float *)aligned_alloc(16, 4 * sizeof(float));
+    sse_data[0] = 1.0;
+    sse_data[1] = 2.0;
+    sse_data[2] = 3.0;
+    sse_data[3] = 4.0;
+    sse_add(sse_data);
+    free(sse_data);
+  }
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  struct timespec diff_sse = diff(start, end);
+  sse_add_time = diff_sse.tv_sec + (diff_sse.tv_nsec / 1e9);
+
+  printf("[Add] Scaler: %.12f seconds  | SSE: %.12f seconds\n", scaler_add_time, sse_add_time);
 
   return 0;
 }
